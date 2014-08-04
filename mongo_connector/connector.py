@@ -27,6 +27,7 @@ import threading
 import time
 import imp
 from mongo_connector import constants, errors, util
+from mongo_connector.remapper import Remapper
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
@@ -42,7 +43,7 @@ class Connector(threading.Thread):
                  collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
                  fields=None, dest_mapping={},
                  auto_commit_interval=constants.DEFAULT_COMMIT_INTERVAL,
-                 continue_on_error=False):
+                 continue_on_error=False, remap_file=None):
 
         if target_url and not doc_manager:
             raise errors.ConnectorError("Cannot create a Connector with a "
@@ -75,6 +76,9 @@ class Connector(threading.Thread):
                 doc_manager_modules = []
                 for dm in doc_manager:
                     doc_manager_modules.append(load_doc_manager(dm))
+
+        if remap_file is not None:
+            self.remap_definition = json.load(open(remap_file, 'r'))
 
         super(Connector, self).__init__()
 
@@ -313,6 +317,7 @@ class Connector(threading.Thread):
                 fields=self.fields,
                 dest_mapping=self.dest_mapping,
                 continue_on_error=self.continue_on_error
+                remapper=Remapper(self.remap_definition)
             )
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
@@ -612,6 +617,11 @@ def main():
                       help=("Log all output to a file rather than stream to "
                             "stderr.   Omit to stream to stderr."))
 
+    #-r enable remapping from one document schema
+    parser.add_option("-r", "--remap_file", action="store",
+                      help=("Remap each document and conditionally filter "
+                            "attributes based on a predicate."))
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
@@ -717,7 +727,8 @@ def main():
         fields=fields,
         dest_mapping=dest_mapping,
         auto_commit_interval=options.commit_interval,
-        continue_on_error=options.continue_on_error
+        continue_on_error=options.continue_on_error,
+        remap_file=options.remap_file
     )
     connector.start()
 

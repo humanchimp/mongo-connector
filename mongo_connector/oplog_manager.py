@@ -40,7 +40,7 @@ class OplogThread(threading.Thread):
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
                  auth_username, repl_set=None, collection_dump=True,
                  batch_size=DEFAULT_BATCH_SIZE, fields=None,
-                 dest_mapping={}, continue_on_error=False):
+                 dest_mapping={}, continue_on_error=False, remapper=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -118,6 +118,8 @@ class OplogThread(threading.Thread):
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             logging.warning('%s %s' % (err_msg, self.primary_connection))
+
+        self.remapper = remapper
 
     @property
     def fields(self):
@@ -209,6 +211,8 @@ class OplogThread(threading.Thread):
                                     # Retrieve inserted document from
                                     # 'o' field in oplog record
                                     doc = entry.get('o')
+                                    if self.remapper is not None:
+                                        doc = self.remapper.remap(doc)
                                     # Extract timestamp and namespace
                                     doc['_ts'] = util.bson_ts_to_long(
                                         entry['ts'])
@@ -221,6 +225,8 @@ class OplogThread(threading.Thread):
                                            "_ts": util.bson_ts_to_long(
                                                entry['ts']),
                                            "ns": ns}
+                                    if self.remapper is not None:
+                                        doc = self.remapper.remap(doc)
                                     # 'o' field contains the update spec
                                     docman.update(doc, entry.get('o', {}))
                                     update_inc += 1
