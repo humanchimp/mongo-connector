@@ -316,7 +316,7 @@ class Connector(threading.Thread):
                 batch_size=self.batch_size,
                 fields=self.fields,
                 dest_mapping=self.dest_mapping,
-                continue_on_error=self.continue_on_error
+                continue_on_error=self.continue_on_error,
                 remapper=Remapper(self.remap_definition)
             )
             self.shard_set[0] = oplog

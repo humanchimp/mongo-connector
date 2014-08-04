@@ -100,6 +100,9 @@ class OplogThread(threading.Thread):
         # Set of fields to export
         self.fields = fields
 
+        # remapper to use, if any
+        self.remapper = remapper
+
         logging.info('OplogThread: Initializing oplog thread')
 
         if is_sharded:
@@ -118,8 +121,6 @@ class OplogThread(threading.Thread):
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             logging.warning('%s %s' % (err_msg, self.primary_connection))
-
-        self.remapper = remapper
 
     @property
     def fields(self):
@@ -211,13 +212,11 @@ class OplogThread(threading.Thread):
                                     # Retrieve inserted document from
                                     # 'o' field in oplog record
                                     doc = entry.get('o')
-                                    if self.remapper is not None:
-                                        doc = self.remapper.remap(doc)
                                     # Extract timestamp and namespace
                                     doc['_ts'] = util.bson_ts_to_long(
                                         entry['ts'])
                                     doc['ns'] = ns
-                                    docman.upsert(doc)
+                                    self.upsert(docman, doc)
                                     upsert_inc += 1
                                 # Update
                                 elif operation == 'u':
@@ -225,10 +224,8 @@ class OplogThread(threading.Thread):
                                            "_ts": util.bson_ts_to_long(
                                                entry['ts']),
                                            "ns": ns}
-                                    if self.remapper is not None:
-                                        doc = self.remapper.remap(doc)
                                     # 'o' field contains the update spec
-                                    docman.update(doc, entry.get('o', {}))
+                                    self.update(docman, doc, entry.get('o', {}))
                                     update_inc += 1
                             except errors.OperationFailed:
                                 logging.exception(
@@ -445,10 +442,14 @@ class OplogThread(threading.Thread):
                         for doc in cursor:
                             if not self.running:
                                 raise StopIteration
+                            last_id = doc["_id"]
                             doc["ns"] = self.dest_mapping.get(
                                 namespace, namespace)
                             doc["_ts"] = long_ts
-                            last_id = doc["_id"]
+                            doc = self.remapper.remap(doc)
+                            if doc is None:
+                                continue
+                            doc["_id"] = last_id
                             yield doc
                         break
                     except pymongo.errors.AutoReconnect:
@@ -462,7 +463,7 @@ class OplogThread(threading.Thread):
                 if num % 10000 == 0:
                     logging.debug("Upserted %d docs." % num)
                 try:
-                    dm.upsert(doc)
+                    self.upsert(dm, doc)
                     num_inserted += 1
                 except Exception:
                     if self.continue_on_error:
@@ -736,7 +737,7 @@ class OplogThread(threading.Thread):
                     doc['ns'] = self.dest_mapping.get(namespace, namespace)
                     try:
                         insert_inc += 1
-                        dm.upsert(doc)
+                        self.upsert(dm, doc)
                     except errors.OperationFailed as e:
                         fail_insert_inc += 1
                         logging.error("OplogThread: Rollback, Unable to "
@@ -749,3 +750,16 @@ class OplogThread(threading.Thread):
                       % (insert_inc, fail_insert_inc, str(rollback_cutoff_ts)))
 
         return rollback_cutoff_ts
+
+    def upsert(self, doc_manager, doc):
+        print 'upsert', doc
+        if self.remapper is not None:
+            doc = self.remapper.remap(doc)
+        doc_manager.upsert(doc)
+
+    def update(self, doc_manager, doc, update_spec):
+        if self.remapper is None:
+            doc_manager.update(doc, update_spec)
+            return
+        new_doc = doc_manager.apply_update(doc, update_spec)
+        doc_manager.upsert(self.remapper.remap(new_doc))

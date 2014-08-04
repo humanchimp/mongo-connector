@@ -1,3 +1,4 @@
+import bson
 import re
 
 def clean_path(dirty):
@@ -60,14 +61,25 @@ def filter_value(value, expr):
 		return False
 
 
+def serialize(value):
+    """If the value is an BSON ObjectId, cast it to a string."""
+    if isinstance(value, bson.objectid.ObjectId):
+        return str(value)
+    else:
+        return value
+
+
 class Remapper:
 
-	def __init__(remap_json):
+	def __init__(self, remap_json):
 		self.attributes_remap = remap_json['remap']
 		self.attributes_filter = remap_json['filter']
 
-	def remap(doc):
-		return self.apply_filter(self.apply_remap(doc))
+	def remap(self, doc):
+		doc, state = self.apply_filter(self.apply_remap(doc))
+		if not state:
+			return None
+		return doc
 
 	def apply_remap(self, doc):
 		"""Copy the values of user-defined fields from the source document to

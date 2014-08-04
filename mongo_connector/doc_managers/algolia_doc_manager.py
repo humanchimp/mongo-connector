@@ -43,14 +43,6 @@ def unix_time_millis(dt=datetime.now()):
     return int(round(unix_time(dt) * 1000.0))
 
 
-def serialize(value):
-    """If the value is an BSON ObjectId, cast it to a string."""
-    if isinstance(value, bson.objectid.ObjectId):
-        return str(value)
-    else:
-        return value
-
-
 class DocManager(DocManagerBase):
     """The DocManager class creates a connection to the Algolia engine and
         adds/removes documents, and in the case of rollback, searches for them.
@@ -94,20 +86,14 @@ class DocManager(DocManagerBase):
         """ Update or insert a document into Algolia
         """
         with self.mutex:
-            filtered_doc, state = self.apply_filter(self.apply_remap(doc),
-                                        self.attributes_filter)
-            last_object_id = serialize(doc[self.unique_key])
-            filtered_doc['objectID'] = last_object_id
-
-            if not state:  # delete in case of update
-                self.batch.append({'action': 'deleteObject',
-                                   'body': {'objectID': last_object_id}})
-                return
+            last_object_id = str(doc[self.unique_key])
+            doc['objectID'] = last_object_id
+            del doc[self.unique_key]
 
             if self.postproc is not None:
                 exec(re.sub(r"_\$", "filtered_doc", self.postproc))
 
-            self.batch.append({'action': 'addObject', 'body': filtered_doc})
+            self.batch.append({'action': 'addObject', 'body': doc})
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
 
