@@ -166,6 +166,7 @@ class DocManager(DocManagerBase):
             user-defined fields in a new target document, then return the
             targetdocument.
             """
+        print doc
         if not self.attributes_remap:
             return doc
         remapped_doc = {}
