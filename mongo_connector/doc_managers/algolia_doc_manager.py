@@ -258,6 +258,7 @@ class DocManager(DocManagerBase):
         """ Removes documents from Algolia
         """
         with self.mutex:
+            print 'delete', doc
             self.batch.append(
                 {'action': 'deleteObject',
                  'body': {'objectID': str(doc[self.unique_key])}})
