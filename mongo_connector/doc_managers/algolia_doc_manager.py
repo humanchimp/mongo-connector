@@ -242,10 +242,10 @@ class DocManager(DocManagerBase):
                                                     self.attributes_filter)
             filtered_doc['objectID'] = last_object_id
 
-            if not state:  # delete in case of update
-                self.batch.append({'action': 'deleteObject',
-                                   'body': {'objectID': last_object_id}})
-                return
+            # if not state:  # delete in case of update
+            #     self.batch.append({'action': 'deleteObject',
+            #                        'body': {'objectID': last_object_id}})
+            #     return
 
             if self.postproc is not None:
                 exec(re.sub(r"_\$", "filtered_doc", self.postproc))
