@@ -166,7 +166,6 @@ class DocManager(DocManagerBase):
             user-defined fields in a new target document, then return the
             targetdocument.
             """
-        print doc
         if not self.attributes_remap:
             return doc
         remapped_doc = {}
@@ -230,12 +229,14 @@ class DocManager(DocManagerBase):
         return (filtered_doc, state)
 
     def update(self, doc, update_spec):
+        print 'update', doc
         self.upsert(self.apply_update(doc, update_spec))
 
     def upsert(self, doc):
         """ Update or insert a document into Algolia
         """
         with self.mutex:
+            print 'upsert', doc
             last_object_id = serialize(doc[self.unique_key])
             filtered_doc, state = self.apply_filter(self.apply_remap(doc),
                                                     self.attributes_filter)
