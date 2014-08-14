@@ -246,6 +246,7 @@ class DocManager(DocManagerBase):
                 exec(re.sub(r"_\$", "filtered_doc", self.postproc))
 
             action = 'addObject' if upsert else 'partialUpdateObject'
+            print 'action', action
             self.batch.append({'action': action, 'body': filtered_doc})
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
