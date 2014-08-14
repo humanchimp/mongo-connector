@@ -230,9 +230,9 @@ class DocManager(DocManagerBase):
 
     def update(self, doc, update_spec):
         print 'update', doc
-        self.upsert(self.apply_update(doc, update_spec))
+        self.upsert(self.apply_update(doc, update_spec, False))
 
-    def upsert(self, doc):
+    def upsert(self, doc, upsert=True):
         """ Update or insert a document into Algolia
         """
         with self.mutex:
@@ -242,15 +242,11 @@ class DocManager(DocManagerBase):
                                                     self.attributes_filter)
             filtered_doc['objectID'] = last_object_id
 
-            # if not state:  # delete in case of update
-            #     self.batch.append({'action': 'deleteObject',
-            #                        'body': {'objectID': last_object_id}})
-            #     return
-
             if self.postproc is not None:
                 exec(re.sub(r"_\$", "filtered_doc", self.postproc))
 
-            self.batch.append({'action': 'addObject', 'body': filtered_doc})
+            action = 'addObject' if upsert else 'partialUpdateObject'
+            self.batch.append({'action': action, 'body': filtered_doc})
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
 
