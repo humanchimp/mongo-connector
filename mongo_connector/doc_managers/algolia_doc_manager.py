@@ -231,7 +231,7 @@ class DocManager(DocManagerBase):
     def update(self, doc, update_spec):
         self.upsert(self.apply_update(doc, update_spec), True)
 
-    def upsert(self, doc, update):
+    def upsert(self, doc, update=False):
         """ Update or insert a document into Algolia
         """
         with self.mutex:
